@@ -1,0 +1,3 @@
+LDA #$2A
+STA $80
+INX
