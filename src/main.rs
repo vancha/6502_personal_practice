@@ -223,6 +223,13 @@ struct Operation {
     operand: Option<Operand>,
 }
 
+enum Instruction {
+    //I think labels
+    Label(u16),
+    //seems to be valid rust..
+    Operation(Operation)
+}
+
 impl Operation {
     fn new(
         mnemonic: Mnemonic,
@@ -274,13 +281,13 @@ impl Assembler {
     }
 
     ///splits into a first and optional second component for further parsing, panics when invalid
-    fn split_line(input_line: String) -> (Mnemonic, Option<(Operand,String)>) {
+    fn split_line(input_line: String) -> (Mnemonic, Option<(String)>) {
         match &input_line.split_once(char::is_whitespace) {
             None => (Mnemonic::from_str(input_line.as_str()), None),
             Some((first, rest)) => {
                 let mnemonic = Mnemonic::from_str(first);
-                let operand = Operand::Word(5);
-                (mnemonic, Some((operand, rest.to_string())))
+                //let operand = Operand::Word(5);
+                (mnemonic, Some((rest.to_string())))
             } //(Mnemonic::from_str(first), Operand::new(rest.to_string())),
         }
     }
@@ -289,42 +296,48 @@ impl Assembler {
     }
     //turns the source code into a vec of actual instructions
     fn parse(&mut self) -> Vec<Operation> {
+        //I think i might want to collect this entire thing into a Vec of instructions, as defined above. I need to remember to also
+        //detect labels
         for line in self.source.lines().filter(|line| !line.is_empty()) {
             if !Assembler::looks_like_label(line) {
                 //let split = 
-                let (mnemonic, operand, source) = match Assembler::split_line(line.to_string()) {
-                       (mnemonic, Some((operand, source))) => {
-                            (mnemonic,Some(operand),Some(source))
+                let (mnemonic, source) = match Assembler::split_line(line.to_string()) {
+                       (mnemonic, Some((source))) => {
+                            (mnemonic,Some(source))
                         },
-                        (mnemonic, None)  => {(mnemonic,None,None) },
+                        (mnemonic, None)  => {(mnemonic,None) },
                 };
                 use crate::{Mnemonic::*, AddressingMode::*};
 
-                let address_mode = match &operand {
+                //let (address_mode, operand) = match &source {
+                let address_mode = match &source {
                     None => AddressingMode::Implied,
                     Some(operand) => {
                         //if operand is some, then so is source
                         let source = source.unwrap();
                         match source.as_bytes() {
-                            [b'#',b'$',_,_] => Immediate,
-                            [b'$',hi,lo] => ZeroPage,
+                            [b'#',b'$',_,_] => {
+                                Immediate
+                            },
+                            [b'$',hi,lo] => {
+                                ZeroPage},
                             //indexed zero-page paterns can look like this: $80,X
-                            [b'$',_,_,b',',b'X'] => ZeroPageX,
+                            [b'$',_,_,b',',b'X'] => {ZeroPageX},
                             //but they can also look like $8, X
-                            [b'$',_,b',',b'X'] => ZeroPageX,
-                            [b'$',_,_,b',',b'Y'] => ZeroPageY,
+                            [b'$',_,b',',b'X'] => {ZeroPageX},
+                            [b'$',_,_,b',',b'Y'] => {ZeroPageY},
                             [b'$',_,_,_,_] => match mnemonic {
-                                BCC | BCS | BEQ | BMI | BNE | BPL | BVC | BVS => Relative,
+                                BCC | BCS | BEQ | BMI | BNE | BPL | BVC | BVS => {Relative},
                                 //ADC | AND | ASL | BIT | CMP | CPX | CPY | DEC | EOR | INC | JMP | JSR | LDA | LDX | LDY | LSR | ORA | ROL
                                 //| ROR | SBC | STA | STX | STY 
-                                _  => Absolute,
+                                _  => {Absolute},
                             },
-                            [b'$',_,_,_,_,b',',b'X'] => AbsoluteXIndexed,
-                            [b'$',_,_,_,_,b',',b'Y'] => AbsoluteYIndexed,
-                            [b'(',b'$',_,_,_,_,b')'] => Indirect,
-                            [b'(',b'$',_,_,b',',b'X',b')'] => IndexedIndirect,
-                            [b'(',b'$',_,_,b')',b',',b'Y'] => IndirectIndexed,
-                            [b'A'] =>  Accumulator,
+                            [b'$',_,_,_,_,b',',b'X'] => {AbsoluteXIndexed},
+                            [b'$',_,_,_,_,b',',b'Y'] => {AbsoluteYIndexed},
+                            [b'(',b'$',_,_,_,_,b')'] => {Indirect},
+                            [b'(',b'$',_,_,b',',b'X',b')'] => {IndexedIndirect},
+                            [b'(',b'$',_,_,b')',b',',b'Y'] => {IndirectIndexed},
+                            [b'A'] =>  {Accumulator},
                             _ =>  panic!("Invalid addressing mode"),
                         }
                     },
@@ -340,24 +353,12 @@ impl Assembler {
                     ),
                 };
 
-                //we can derive the total size based on the addressing mode
-                /* currently broken, but we probably just want to get the size from the operation/instruction?
-                let size: u8 = match address_mode {
-                    AddressingMode::Implied | AddressingMode::Accumulator => 1,
-                    AddressingMode::Immediate
-                    | AddressingMode::ZeroPage
-                    | AddressingMode::ZeroPageX
-                    | AddressingMode::ZeroPageY
-                    | AddressingMode::Indirect => 2,
-                    _ => 3,
-                }; */
-
                 //This part, i'm not so sure about.. 
                 self.parsed_source.push(Operation::new(
                     mnemonic,
                     address_mode,
                     opcode,
-                    operand,
+                    Some(Operand::Byte(4)),
                 ));
 
 
