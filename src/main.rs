@@ -1,10 +1,8 @@
-use std::ops::Add;
 //https://www.masswerk.at/6502/6502_instruction_set.html#INX
 use std::collections::HashMap;
 use std::path::Path;
 use std::sync::LazyLock;
-
-use crate::AddressingMode::Accumulator;
+use crate::{AddressingMode::{*, Accumulator}, Mnemonic::*};
 
 const OPCODE_SIZE: u8 = 1;
 
@@ -218,16 +216,14 @@ pub enum AddressingMode {
 struct Operation {
     mnemonic: Mnemonic,
     opcode: u8,
-    adressing_mode: AddressingMode,
-    size: u8, //in bytes
+    addressing_mode: AddressingMode,
+    size: u8,
     operand: Option<Operand>,
 }
 
 #[derive(Clone, Debug)]
 enum Instruction {
-    //I think labels
     Label(u16),
-    //seems to be valid rust..
     Operation(Operation),
 }
 
@@ -239,21 +235,21 @@ impl Operation {
         operand: Option<Operand>,
     ) -> Self {
         Operation {
-            mnemonic: mnemonic,
-            opcode: opcode,
-            adressing_mode: addressing_mode,
+            mnemonic,
+            opcode,
+            addressing_mode,
             size: 0,
-            operand: operand,
+            operand,
         }
     }
-
+    //@todo: this is wrong at the moment..
     fn size(&self) -> u8 {
         match &self.operand {
-            Some(operand) => match self.adressing_mode {
-                Accumulator | AddressingMode::Implied => 1u8,
-                _ => 2u8,
+            Some(_operand) => match self.addressing_mode {
+                Accumulator | AddressingMode::Implied => OPCODE_SIZE,
+                _ => OPCODE_SIZE + 2u8,
             },
-            None => 1u8,
+            None => OPCODE_SIZE + 1u8,
         }
     }
 }
@@ -277,51 +273,46 @@ impl Assembler {
             parsed_source: vec![],
         }
     }
-    fn parse_operand(operand: &str) -> AddressingMode {
+    fn parse_operand(_operand: &str) -> AddressingMode {
         AddressingMode::Absolute
     }
 
-    ///splits into a first and optional second component for further parsing, panics when invalid
-    fn split_line(input_line: String) -> (Mnemonic, Option<(String)>) {
+    ///splits into a first and optional second component for further parsing @todo: should panic when invalid
+    fn split_line(input_line: String) -> (Mnemonic, Option<String>) {
         match &input_line.split_once(char::is_whitespace) {
             None => (Mnemonic::from_str(input_line.as_str()), None),
             Some((first, rest)) => {
                 let mnemonic = Mnemonic::from_str(first);
-                //let operand = Operand::Word(5);
-                (mnemonic, Some((rest.to_string())))
-            } //(Mnemonic::from_str(first), Operand::new(rest.to_string())),
+                (mnemonic, Some(rest.to_string()))
+            } 
         }
     }
     fn looks_like_label(input: &str) -> bool {
         input.ends_with(':')
     }
-    //turns the source code into a vec of actual instructions
-    //fn parse(&mut self) -> Vec<Operation> {
+    //turns the source code into a vec of Instructions that all have a known size in bytes
+    //this is the *first* pass, to be followed by a second pass that turns this into a list of
+    //bytes with the correct memory locations
     fn parse(&mut self) -> Vec<Instruction> {
-        //I think i might want to collect this entire thing into a Vec of instructions, as defined above. I need to remember to also
-        //detect labels
         for line in self.source.lines().filter(|line| !line.is_empty()) {
             if !Assembler::looks_like_label(line) {
                 //let split =
                 let (mnemonic, source) = match Assembler::split_line(line.to_string()) {
-                    (mnemonic, Some((source))) => (mnemonic, Some(source)),
+                    (mnemonic, Some(source)) => (mnemonic, Some(source)),
                     (mnemonic, None) => (mnemonic, None),
                 };
-                use crate::{AddressingMode::*, Mnemonic::*};
 
-                //let (address_mode, operand) = match &source {
                 let address_mode = match &source {
                     None => AddressingMode::Implied,
-                    Some(operand) => {
+                    Some(_operand) => {
                         //if operand is some, then so is source
                         let source = source.unwrap();
                         match source.as_bytes() {
                             [b'#', b'$', _, _] => Immediate,
-                            [b'$', high_byte, low_byte] => ZeroPage,
-                            //indexed zero-page paterns can look like this: $80,X
+                            [b'$', _high_byte, _low_byte] => ZeroPage,
+                            //indexed zero-page paterns can look like this: $80,X (maybe technicall
+                            //also like $8, X?)
                             [b'$', _, _, b',', b'X'] => ZeroPageX,
-                            //but they can also look like $8, X
-                            [b'$', _, b',', b'X'] => ZeroPageX,
                             [b'$', _, _, b',', b'Y'] => ZeroPageY,
                             [b'$', _, _, _, _] => match mnemonic {
                                 BCC | BCS | BEQ | BMI | BNE | BPL | BVC | BVS => Relative,
@@ -331,8 +322,8 @@ impl Assembler {
                             },
                             [b'$', _, _, _, _, b',', b'X'] => AbsoluteXIndexed,
                             [b'$', _, _, _, _, b',', b'Y'] => AbsoluteYIndexed,
-                            [b'(', b'$', _, _, _, _, b')'] => Indirect,
                             [b'(', b'$', _, _, b',', b'X', b')'] => IndexedIndirect,
+                            [b'(', b'$', _, _, _, _, b')'] => Indirect,
                             [b'(', b'$', _, _, b')', b',', b'Y'] => IndirectIndexed,
                             [b'A'] => Accumulator,
                             _ => panic!("Invalid addressing mode"),
@@ -345,7 +336,7 @@ impl Assembler {
                     Some(value) => *value,
                     None => panic!(
                         "Sorry, no opcode exists for {:?}",
-                        &(mnemonic, address_mode)
+                        (mnemonic, address_mode)
                     ),
                 };
 
@@ -358,14 +349,7 @@ impl Assembler {
                 )));
             } else {
                 self.parsed_source.push(Instruction::Label(1u16));
-                //self.parsed_source.push();
             }
-
-            //println!("TOOPLE: {:?}",TOOPLE);
-            //let components = line.split_whitespace().collect::<Vec<&str>>();
-            //i think components at this point can not be empty, because  filtered out empty lines
-            //first will always return a value, so safe to unwrap
-            //let mnemonic = Mnemonic::from_str(components.first().unwrap());
         }
         self.parsed_source.clone()
     }
@@ -374,17 +358,14 @@ impl Assembler {
 fn main() {
     //should assemble into "A9 2A 85 80 E8"
     let contents = String::from("LDA #$2A\nSTA $80\nINX");
-    let mut parser = Assembler::from_string(contents); //Assembler::new(Path::new("practice_asm.asm"));
+    let mut parser = Assembler::from_string(contents);
     parser.parse();
     println!("stayt: {:?}", parser);
 }
 
 #[cfg(test)]
 mod tests {
-
     use crate::AddressingMode::{Absolute, AbsoluteXIndexed, IndirectIndexed, ZeroPageX};
-
-    // Note this useful idiom: importing names from outer (for mod tests) scope.
     use super::{AddressingMode, Assembler, Mnemonic, Operand, Operation};
 
     #[test]
