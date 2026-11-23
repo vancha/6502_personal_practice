@@ -85,7 +85,7 @@ static OPCODE_MAP: LazyLock<HashMap<(Mnemonic, AddressingMode), u8>> = LazyLock:
         ((Mnemonic::DEC, AddressingMode::ZeroPage), 0xC6),
         ((Mnemonic::DEC, AddressingMode::ZeroPageX), 0xD6),
         ((Mnemonic::DEC, AddressingMode::Absolute), 0xCE),
-        ((Mnemonic::DEC, AddressingMode::AbsoluteXIndexed),0xDE),
+        ((Mnemonic::DEC, AddressingMode::AbsoluteXIndexed), 0xDE),
         //DEX
         ((Mnemonic::DEX, AddressingMode::Implied), 0xCA),
         //DEY
@@ -123,22 +123,73 @@ static OPCODE_MAP: LazyLock<HashMap<(Mnemonic, AddressingMode), u8>> = LazyLock:
         ((Mnemonic::LDA, AddressingMode::IndexedIndirect), 0xA1),
         ((Mnemonic::LDA, AddressingMode::IndirectIndexed), 0xB1),
         //LDX
+        ((Mnemonic::LDX, AddressingMode::Immediate), 0xA2),
+        ((Mnemonic::LDX, AddressingMode::ZeroPage), 0xA6),
+        ((Mnemonic::LDX, AddressingMode::ZeroPageY), 0xB6),
+        ((Mnemonic::LDX, AddressingMode::Absolute), 0xAE),
+        ((Mnemonic::LDX, AddressingMode::AbsoluteYIndexed), 0xBE),
         //LDY
+        ((Mnemonic::LDY, AddressingMode::Immediate), 0xA0),
+        ((Mnemonic::LDY, AddressingMode::ZeroPage), 0xA4),
+        ((Mnemonic::LDY, AddressingMode::ZeroPageX), 0xB4),
+        ((Mnemonic::LDY, AddressingMode::Absolute), 0xAC),
+        ((Mnemonic::LDY, AddressingMode::AbsoluteXIndexed), 0xBC),
         //LSR
+        ((Mnemonic::LSR, AddressingMode::Immediate), 0x4A),
+        ((Mnemonic::LSR, AddressingMode::ZeroPage), 0x46),
+        ((Mnemonic::LSR, AddressingMode::ZeroPageX), 0x56),
+        ((Mnemonic::LSR, AddressingMode::Absolute), 0x4E),
+        ((Mnemonic::LSR, AddressingMode::AbsoluteYIndexed), 0x5E),
         //NOP
+        ((Mnemonic::NOP, AddressingMode::Implied), 0xEA),
         //ORA
+        ((Mnemonic::ORA, AddressingMode::Immediate), 0x09),
+        ((Mnemonic::ORA, AddressingMode::ZeroPage), 0x05),
+        ((Mnemonic::ORA, AddressingMode::ZeroPageX), 0x15),
+        ((Mnemonic::ORA, AddressingMode::Absolute), 0x0D),
+        ((Mnemonic::ORA, AddressingMode::AbsoluteXIndexed), 0x1D),
+        ((Mnemonic::ORA, AddressingMode::AbsoluteYIndexed), 0x19),
+        ((Mnemonic::ORA, AddressingMode::IndexedIndirect), 0x01), // (oper,X)
+        ((Mnemonic::ORA, AddressingMode::IndirectIndexed), 0x11), // (oper),Y
         //PHA
+        ((Mnemonic::PHA, AddressingMode::Implied), 0x48),
         //PHP
+        ((Mnemonic::PHP, AddressingMode::Implied), 0x08),
         //PLA
+        ((Mnemonic::PLA, AddressingMode::Implied), 0x68),
         //PLP
+        ((Mnemonic::PLP, AddressingMode::Implied), 0x028),
         //ROL
+        ((Mnemonic::ROL, AddressingMode::Accumulator), 0x2A),
+        ((Mnemonic::ROL, AddressingMode::ZeroPage), 0x26),
+        ((Mnemonic::ROL, AddressingMode::ZeroPageX), 0x36),
+        ((Mnemonic::ROL, AddressingMode::Absolute), 0x2E),
+        ((Mnemonic::ROL, AddressingMode::AbsoluteXIndexed), 0x3E),
         //ROR
+        ((Mnemonic::ROR, AddressingMode::Accumulator), 0x6A),
+        ((Mnemonic::ROR, AddressingMode::ZeroPage), 0x66),
+        ((Mnemonic::ROR, AddressingMode::ZeroPageX), 0x76),
+        ((Mnemonic::ROR, AddressingMode::Absolute), 0x6E),
+        ((Mnemonic::ROR, AddressingMode::AbsoluteXIndexed), 0x7E),
         //RTI
+        ((Mnemonic::RTI, AddressingMode::Implied), 0x40),
         //RTS
+        ((Mnemonic::RTS, AddressingMode::Implied), 0x60),
         //SBC
+        ((Mnemonic::SBC, AddressingMode::Immediate), 0xE9),
+        ((Mnemonic::SBC, AddressingMode::ZeroPage), 0xE5),
+        ((Mnemonic::SBC, AddressingMode::ZeroPageX), 0xF5),
+        ((Mnemonic::SBC, AddressingMode::Absolute), 0xED),
+        ((Mnemonic::SBC, AddressingMode::AbsoluteXIndexed), 0xFD),
+        ((Mnemonic::SBC, AddressingMode::AbsoluteYIndexed), 0xF9),
+        ((Mnemonic::SBC, AddressingMode::IndexedIndirect), 0xE1), // (oper, X)
+        ((Mnemonic::SBC, AddressingMode::IndirectIndexed), 0xF1), // (oper),Y
         //SEC
+        ((Mnemonic::SEC, AddressingMode::Implied), 0x38),
         //SED
+        ((Mnemonic::SED, AddressingMode::Implied), 0xF8),
         //SEI
+        ((Mnemonic::SEI, AddressingMode::Implied), 0x78),
         //STA
         ((Mnemonic::STA, AddressingMode::ZeroPage), 0x85),
         ((Mnemonic::STA, AddressingMode::ZeroPageX), 0x95),
@@ -148,13 +199,25 @@ static OPCODE_MAP: LazyLock<HashMap<(Mnemonic, AddressingMode), u8>> = LazyLock:
         ((Mnemonic::STA, AddressingMode::IndexedIndirect), 0x81),
         ((Mnemonic::STA, AddressingMode::IndirectIndexed), 0x91),
         //STX
+        ((Mnemonic::STX, AddressingMode::ZeroPage), 0x86),
+        ((Mnemonic::STX, AddressingMode::ZeroPageY), 0x96),
+        ((Mnemonic::STX, AddressingMode::Absolute), 0x8E),
         //STY
+        ((Mnemonic::STY, AddressingMode::ZeroPage), 0x84),
+        ((Mnemonic::STY, AddressingMode::ZeroPageX), 0x94),
+        ((Mnemonic::STY, AddressingMode::Absolute), 0x8C),
         //TAX
+        ((Mnemonic::TAX, AddressingMode::Implied), 0xAA),
         //TAY
+        ((Mnemonic::TAY, AddressingMode::Implied), 0xA8),
         //TSX
+        ((Mnemonic::TSX, AddressingMode::Implied), 0xBA),
         //TXA
+        ((Mnemonic::SEI, AddressingMode::Implied), 0x78),
         //TXS
+        ((Mnemonic::TXS, AddressingMode::Implied), 0x9A),
         //TYA
+        ((Mnemonic::TYA, AddressingMode::Implied), 0x98),
     ])
 });
 
@@ -300,18 +363,20 @@ impl Operand {
     fn from_ascii_byte(input: &str) -> Self {
         Operand::Byte(u8::from_str_radix(input, 16).unwrap())
     }
+    
     fn from_word(input: u16) -> Self {
         Operand::Word(input)
     }
+
+    /* note that we can turn this into an eventual size when we have operands of the temporary variety */
     fn size(&self) -> u8 {
         match self {
             Operand::Byte(_) => 1,
             Operand::Word(_) => 2,
-            //this temporary Operand only holds the offset for what will become a
             Operand::Temporary(_) => 1,
         }
     }
-
+    /* but we can *not* turn them into bytes. */
     fn to_bytes(&self) -> Vec<u8> {
         match self {
             Operand::Byte(value) => vec![*value],
