@@ -103,7 +103,7 @@ static OPCODE_MAP: LazyLock<HashMap<(Mnemonic, AddressingMode), u8>> = LazyLock:
         ((Mnemonic::INC, AddressingMode::ZeroPage), 0xE6),
         ((Mnemonic::INC, AddressingMode::ZeroPageX), 0xF6),
         ((Mnemonic::INC, AddressingMode::Absolute), 0xEE),
-        ((Mnemonic::INC, AddressingMode::AbsoluteXIndexed), 0xFe),
+        ((Mnemonic::INC, AddressingMode::AbsoluteXIndexed), 0xFE),
         //INX
         ((Mnemonic::INX, AddressingMode::Implied), 0xE8),
         //INY
@@ -287,62 +287,62 @@ pub enum Mnemonic {
 impl Mnemonic {
     fn from_str(mnemonic: &str) -> Self {
         match mnemonic.trim_ascii().to_ascii_uppercase().as_str() {
-            "ADC" => Mnemonic::ADC,
-            "AND" => Mnemonic::AND,
-            "ASL" => Mnemonic::ASL,
-            "BCC" => Mnemonic::BCC,
-            "BCS" => Mnemonic::BCS,
-            "BEQ" => Mnemonic::BEQ,
-            "BIT" => Mnemonic::BIT,
-            "BMI" => Mnemonic::BMI,
-            "BNE" => Mnemonic::BNE,
-            "BPL" => Mnemonic::BPL,
-            "BRK" => Mnemonic::BRK,
-            "BVC" => Mnemonic::BVC,
-            "BVS" => Mnemonic::BVS,
-            "CLC" => Mnemonic::CLC,
-            "CLD" => Mnemonic::CLD,
-            "CLI" => Mnemonic::CLI,
-            "CLV" => Mnemonic::CLV,
-            "CMP" => Mnemonic::CMP,
-            "CPX" => Mnemonic::CPX,
-            "CPY" => Mnemonic::CPY,
-            "DEC" => Mnemonic::DEC,
-            "DEX" => Mnemonic::DEX,
-            "DEY" => Mnemonic::DEY,
-            "EOR" => Mnemonic::EOR,
-            "INC" => Mnemonic::INC,
-            "INX" => Mnemonic::INX,
-            "INY" => Mnemonic::INY,
-            "JMP" => Mnemonic::JMP,
-            "JSR" => Mnemonic::JSR,
-            "LDA" => Mnemonic::LDA,
-            "LDX" => Mnemonic::LDX,
-            "LDY" => Mnemonic::LDY,
-            "LSR" => Mnemonic::LSR,
-            "NOP" => Mnemonic::NOP,
-            "ORA" => Mnemonic::ORA,
-            "PHA" => Mnemonic::PHA,
-            "PHP" => Mnemonic::PHP,
-            "PLA" => Mnemonic::PLA,
-            "PLP" => Mnemonic::PLP,
-            "ROL" => Mnemonic::ROL,
-            "ROR" => Mnemonic::ROR,
-            "RTI" => Mnemonic::RTI,
-            "RTS" => Mnemonic::RTS,
-            "SBC" => Mnemonic::SBC,
-            "SEC" => Mnemonic::SEC,
-            "SED" => Mnemonic::SED,
-            "SEI" => Mnemonic::SEI,
-            "STA" => Mnemonic::STA,
-            "STX" => Mnemonic::STX,
-            "STY" => Mnemonic::STY,
-            "TAX" => Mnemonic::TAX,
-            "TAY" => Mnemonic::TAY,
-            "TSX" => Mnemonic::TSX,
-            "TXA" => Mnemonic::TXA,
-            "TXS" => Mnemonic::TXS,
-            "TYA" => Mnemonic::TYA,
+            "ADC" => ADC,
+            "AND" => AND,
+            "ASL" => ASL,
+            "BCC" => BCC,
+            "BCS" => BCS,
+            "BEQ" => BEQ,
+            "BIT" => BIT,
+            "BMI" => BMI,
+            "BNE" => BNE,
+            "BPL" => BPL,
+            "BRK" => BRK,
+            "BVC" => BVC,
+            "BVS" => BVS,
+            "CLC" => CLC,
+            "CLD" => CLD,
+            "CLI" => CLI,
+            "CLV" => CLV,
+            "CMP" => CMP,
+            "CPX" => CPX,
+            "CPY" => CPY,
+            "DEC" => DEC,
+            "DEX" => DEX,
+            "DEY" => DEY,
+            "EOR" => EOR,
+            "INC" => INC,
+            "INX" => INX,
+            "INY" => INY,
+            "JMP" => JMP,
+            "JSR" => JSR,
+            "LDA" => LDA,
+            "LDX" => LDX,
+            "LDY" => LDY,
+            "LSR" => LSR,
+            "NOP" => NOP,
+            "ORA" => ORA,
+            "PHA" => PHA,
+            "PHP" => PHP,
+            "PLA" => PLA,
+            "PLP" => PLP,
+            "ROL" => ROL,
+            "ROR" => ROR,
+            "RTI" => RTI,
+            "RTS" => RTS,
+            "SBC" => SBC,
+            "SEC" => SEC,
+            "SED" => SED,
+            "SEI" => SEI,
+            "STA" => STA,
+            "STX" => STX,
+            "STY" => STY,
+            "TAX" => TAX,
+            "TAY" => TAY,
+            "TSX" => TSX,
+            "TXA" => TXA,
+            "TXS" => TXS,
+            "TYA" => TYA,
             &_ => panic!("this instruction looks invalid.."),
         }
     }
@@ -355,9 +355,8 @@ impl Mnemonic {
 enum Operand {
     Byte(u8),
     Word(u16),
-    //Temporary u8 holds an offset, and should be turned into a Word(u16) when we get the absolute address the offset points to
-    //Temporary(u8),
-    Label(String),
+    RelativeLabel(String),
+    AbsoluteLabel(String),
 }
 
 impl Operand {
@@ -368,21 +367,12 @@ impl Operand {
     fn from_word(input: u16) -> Self {
         Operand::Word(input)
     }
-
-    /* note that we can turn this into an eventual size when we have operands of the temporary variety */
-    fn size(&self) -> u8 {
-        match self {
-            Operand::Byte(_) => 1,
-            Operand::Word(_) => 2,
-            Operand::Label(_) => 1,//not quite certain at this point! String could resolve to absolute or relative address
-        }
-    }
-    /* but we can *not* turn them into bytes. */
+    
     fn to_bytes(&self) -> Vec<u8> {
         match self {
             Operand::Byte(value) => vec![*value],
             Operand::Word(value) => value.to_le_bytes().to_vec(),
-            Operand::Label(_) => panic!("We can not turn Relative addresses into bytes before calculating their actual locations."),
+            Operand::RelativeLabel(_) | Operand::AbsoluteLabel(_) => panic!("We can not turn Relative addresses into bytes before calculating their actual locations."),
         }
     }
 }
@@ -411,6 +401,18 @@ pub enum AddressingMode {
     ZeroPageY,
     Relative,
 }
+
+impl AddressingMode {
+    fn operand_size(&self) -> u8 {
+        match &self {
+            Implied | Accumulator => 0,
+            Immediate | ZeroPage | ZeroPageX | ZeroPageY | Relative | IndexedIndirect | IndirectIndexed => 1,
+            Absolute | AbsoluteXIndexed | AbsoluteYIndexed | Indirect => 2,
+
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 struct Operation {
     mnemonic: Mnemonic,
@@ -424,6 +426,19 @@ struct Operation {
 enum Instruction {
     Label(String),
     Operation(Operation),
+}
+
+impl Instruction {
+    fn size(&self)-> u8 {
+        match self {
+            Instruction::Label(_) => 0,
+            //Instruction::RelativeLabel(_) => 1,
+            //Instruction::AbsoluteLabel(_) => 2,
+            Instruction::Operation(operation) => {
+                operation.size()
+            },
+        }
+    }
 }
 
 impl Operation {
@@ -443,11 +458,7 @@ impl Operation {
     }
 
     fn size(&self) -> u8 {
-        OPCODE_SIZE
-            + match &self.operand {
-                Some(operand) => operand.size(),
-                None => 0,
-            }
+        OPCODE_SIZE + self.addressing_mode.operand_size()
     }
 }
 #[derive(Debug)]
@@ -492,23 +503,17 @@ impl Assembler {
     //this is the *first* pass, to be followed by a second pass that turns this into a list of
     //bytes with the correct memory locations
     fn first_pass(&mut self) -> Vec<Instruction> {
-        for (index, line) in self
+        for  line in self
             .source
             .lines()
             .filter(|line| !line.is_empty())
-            .enumerate()
         {
             if !Assembler::looks_like_label(line) {
-                //let split =
                 let (mnemonic, source) = match Assembler::split_line(line.to_string()) {
                     (mnemonic, Some(source)) => (mnemonic, Some(source)),
                     (mnemonic, None) => (mnemonic, None),
                 };
 
-                /*
-                @TODO: So far this entire match thingy completely ignores the fact that while a *line* could define a label,
-                instructions can *also* have labels as their argument! pls fix this...
-                 */
                 let (address_mode, operand) = match &source {
                     None => (AddressingMode::Implied, None::<Operand>),
                     Some(_operand) => {
@@ -526,7 +531,7 @@ impl Assembler {
                             //also like $8, X?)
                             [b'$', _, _, b',', b'X'] => (
                                 ZeroPageX,
-                                todo!("sorry man i aint implemented any of this :( "),
+                                Some(Operand::from_ascii_byte(&source[1..3]))
                             ),
                             [b'$', _, _, b',', b'Y'] => {
                                 (ZeroPageY, Some(Operand::from_ascii_byte(&source[1..3])))
@@ -584,14 +589,14 @@ impl Assembler {
                                 if Mnemonic::supports_addressing_mode(mnemonic, &AddressingMode::Relative) {
                                     (
                                         Relative,
-                                        Some(Operand::Label(source.to_string()))
+                                        Some(Operand::RelativeLabel(source.to_string()))
                                     )
 
                                 } else if Mnemonic::supports_addressing_mode(mnemonic, &AddressingMode::Absolute) {
 
                                      (
                                         Absolute,
-                                        Some(Operand::Label(source.to_string()))
+                                        Some(Operand::AbsoluteLabel(source.to_string()))
                                     )
                                 } else {
                                     panic!("{:?} seems to have an operand i cannot quite decode: {:?}",mnemonic, source)
@@ -600,7 +605,7 @@ impl Assembler {
                         }
                     }
                 };
-                println!("The magic boah: {:0x?}", operand);
+
                 //we can get the opcode from the combination of mnemonic + addressing mode
                 let opcode: u8 = match OPCODE_MAP.get(&(mnemonic, address_mode)) {
                     Some(value) => *value,
@@ -623,7 +628,12 @@ impl Assembler {
         self.parsed_source.clone()
     }
 
-    fn second_pass(&self) -> Vec<u8> {
+    fn second_pass(&self, instructions: Vec<Instruction> ) -> Vec<u8> {
+        //our instruction can be operations or labels
+        for instruction in instructions {
+            println!("{:?} is {:?} bytes in size", instruction, instruction.size());
+        }
+        
         vec![]
     }
 }
@@ -647,7 +657,11 @@ decrement:
 
     println!("The input to this program is the following: {:?}", contents);
     let mut parser = Assembler::from_string(contents);
-    parser.first_pass();
+    let first_pass_result = parser.first_pass();
+    let lil_bytes = parser.second_pass(first_pass_result);
+    //for operation in first_pass_result {
+    //println!("{:?}",operation);
+    //}
 }
 
 #[cfg(test)]
