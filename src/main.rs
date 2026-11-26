@@ -356,14 +356,15 @@ enum Operand {
     Byte(u8),
     Word(u16),
     //Temporary u8 holds an offset, and should be turned into a Word(u16) when we get the absolute address the offset points to
-    Temporary(u8),
+    //Temporary(u8),
+    Label(String),
 }
 
 impl Operand {
     fn from_ascii_byte(input: &str) -> Self {
         Operand::Byte(u8::from_str_radix(input, 16).unwrap())
     }
-    
+
     fn from_word(input: u16) -> Self {
         Operand::Word(input)
     }
@@ -373,7 +374,7 @@ impl Operand {
         match self {
             Operand::Byte(_) => 1,
             Operand::Word(_) => 2,
-            Operand::Temporary(_) => 1,
+            Operand::Label(_) => 1,//not quite certain at this point! String could resolve to absolute or relative address
         }
     }
     /* but we can *not* turn them into bytes. */
@@ -381,7 +382,7 @@ impl Operand {
         match self {
             Operand::Byte(value) => vec![*value],
             Operand::Word(value) => value.to_le_bytes().to_vec(),
-            Operand::Temporary(_) => panic!("We can not turn Relative addresses into bytes before calculating their actual locations."),
+            Operand::Label(_) => panic!("We can not turn Relative addresses into bytes before calculating their actual locations."),
         }
     }
 }
@@ -421,7 +422,7 @@ struct Operation {
 
 #[derive(Clone, Debug, PartialEq)]
 enum Instruction {
-    Label(u16),
+    Label(String),
     Operation(Operation),
 }
 
@@ -475,7 +476,7 @@ impl Assembler {
 
     ///splits into a first and optional second component for further parsing @todo: should panic when invalid
     fn split_line(input_line: String) -> (Mnemonic, Option<String>) {
-        match &input_line.split_once(char::is_whitespace) {
+        match &input_line.trim_ascii().split_once(char::is_whitespace) {
             None => (Mnemonic::from_str(input_line.as_str()), None),
             Some((first, rest)) => {
                 let mnemonic = Mnemonic::from_str(first);
@@ -484,7 +485,7 @@ impl Assembler {
         }
     }
     fn looks_like_label(input: &str) -> bool {
-        input.ends_with(':')
+        input.trim_ascii().ends_with(':')
     }
 
     //turns the source code into a vec of Instructions that all have a known size in bytes
@@ -514,6 +515,7 @@ impl Assembler {
                         //if operand is some, then so is source
                         let source = source.unwrap();
                         match source.as_bytes() {
+                            [b'A'] => (Accumulator, None),
                             [b'#', b'$', _, _] => {
                                 (Immediate, Some(Operand::from_ascii_byte(&source[2..4])))
                             }
@@ -575,8 +577,26 @@ impl Assembler {
                                     u8::from_str_radix(&source[2..4], 16).unwrap(),
                                 )),
                             ),
-                            [b'A'] => (Accumulator, None),
-                            _ => panic!("Invalid addressing mode"),
+                            //It is likely that I actually need the instruction here to know if the instruction supports relative or absolute addressing.
+                            //A label can be BOTH :S
+                            _ => {
+                                //lets see what we support:
+                                if Mnemonic::supports_addressing_mode(mnemonic, &AddressingMode::Relative) {
+                                    (
+                                        Relative,
+                                        Some(Operand::Label(source.to_string()))
+                                    )
+
+                                } else if Mnemonic::supports_addressing_mode(mnemonic, &AddressingMode::Absolute) {
+
+                                     (
+                                        Absolute,
+                                        Some(Operand::Label(source.to_string()))
+                                    )
+                                } else {
+                                    panic!("{:?} seems to have an operand i cannot quite decode: {:?}",mnemonic, source)
+                                }
+                            }
                         }
                     }
                 };
@@ -593,10 +613,11 @@ impl Assembler {
                         mnemonic,
                         address_mode,
                         opcode,
-                        Some(Operand::Byte(4)),
+                        operand,
                     )));
             } else {
-                self.parsed_source.push(Instruction::Label(1u16));
+                //println!("LABEL: {:?}", line);
+                self.parsed_source.push(Instruction::Label(line.to_string()));
             }
         }
         self.parsed_source.clone()
@@ -609,10 +630,24 @@ impl Assembler {
 
 fn main() {
     //should assemble into "A9 2A 85 80 E8"
-    let contents = String::from("LDA #$2A\nSTA $80\nINX");
+    //let contents = String::from("LDA #$2A\nSTA $80\nINX");
+
+    //Should assemble into (0600: starting point on skilldrick emulator) a2 08 ca 8e 00 02 e0 03 d0 f8 8e 01 02 00
+    let contents = String::from(
+        "   LDX #$08
+decrement:
+    DEX
+    STX $0200
+    CPX #$03
+    BNE decrement
+    STX $0201
+    BRK
+",
+    );
+
+    println!("The input to this program is the following: {:?}", contents);
     let mut parser = Assembler::from_string(contents);
     parser.first_pass();
-    println!("stayt: {:?}", parser);
 }
 
 #[cfg(test)]
@@ -643,6 +678,20 @@ mod tests {
         );
     }
 
+    #[test]
+    fn does_branching() {
+        //Should assemble into (0600: starting point on skilldrick emulator) a2 08 ca 8e 00 02 e0 03 d0 f8 8e 01 02 00
+        let input = "   LDX #$08
+decrement:
+    DEX
+    STX $0200
+    CPX #$03
+    BNE decrement
+    STX $0201
+    BRK
+";
+        let assembler = Assembler::from_string(input.to_string()).first_pass();
+    }
     fn detects_addressing_modes() {
         let immediate = String::from("LDA #$2A");
         let zeropage = String::from("LDA $80");
@@ -653,10 +702,6 @@ mod tests {
         let indexedindirect = String::from("LDA ($80,X)");
         let indirectindexed = String::from("LDA ($80),Y");
         //todo!("correctly interprets where labels in the source point to for jumps")
-    }
-
-    fn derives_opcode_from_mnemonic() {
-        todo!("Correctly knows which opcode corresponds with which mnemonic")
     }
 
     fn parses_load_correctly() {
@@ -679,21 +724,5 @@ mod tests {
         LDY $1234   ; Absolute
         LDY $80,X   ; Zero page,X
         LDY $1234,X ; Absolute,X */
-    }
-
-    //#[test]
-    fn parses_immediate_load_instruction() {
-        let assembly_input = String::from("LDA #$2A");
-        let load_instruction: &Operation = &Operation::new(
-            Mnemonic::LDA,
-            AddressingMode::Immediate,
-            0xA9,
-            Some(Operand::Byte(0x2A)),
-        );
-
-        let binding = Assembler::from_string(assembly_input.clone()).first_pass();
-        let assembler_result = binding.first().unwrap();
-        //let assembler_result = Assembler::from_string(assembly_input.clone()).parse().first().unwrap();
-        //assert_eq!(load_instruction, assembler_result);
     }
 }
